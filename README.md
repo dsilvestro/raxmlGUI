@@ -1,6 +1,8 @@
 raxmlGUI -- A graphical front-end for RAxML
+----------------------------------------
 
-Silvestro, D. & Michalak, I. (2012) raxmlGUI: A graphical front-end for RAxML. 
+Silvestro, D. & Michalak, I. (2012) raxmlGUI: A graphical front-end for RAxML.
+
 
 General Info
 ----------------------------------------
@@ -8,6 +10,7 @@ raxmlGUI version 1.3 has been tested under Mac (Intel 64bit; OS 10.6, 10.7)
 Windows (XP, 7), and Linux (Ubuntu) using Python 2.5-2.7.
 The package includes executable files of RAxML 7.4.2 (Stamatakis, 2006) 
 compiled for the different operating systems.
+Please cite: Organisms Diversity and Evolution, 12, 335–337. DOI: 10.1007/s13127-011-0056-0.
 
 raxmlGUI does not support Python 3.
 
