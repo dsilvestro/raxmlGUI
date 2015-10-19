@@ -1,6 +1,6 @@
 raxmlGUI -- A graphical front-end for RAxML
-                   version 1.5b1, June 2015
 ----------------------------------------
+version 1.5b1, June 2015
 
 Silvestro, D. & Michalak, I. (2012) raxmlGUI: A graphical front-end for RAxML. 
 Organisms Diversity & Evolution 12, 335-337, DOI: 10.1007/s13127-011-0056-0
