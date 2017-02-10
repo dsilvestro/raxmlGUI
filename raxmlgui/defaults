@@ -1,10 +1,10 @@
-RAxML_version: raxmlHPC-none
+RAxML_version: raxmlHPC_8121_Ubuntu
 Number_processors: 2 
 Substitution_Model: GTRGAMMA 
 Analysis: rapid bootstrap 
-BS_replicates: autoMRE 
+BS_replicates: 100 
 open_MLtree: no
-OS: none
+OS: Linux
 Term: Terminal
 Toolbar_color: DBDBDB
 Wrap_line: none

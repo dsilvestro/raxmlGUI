@@ -1,5 +1,5 @@
 #!/usr/bin/env python 
-# raxmlGUI 1.3 build 20120725. A graphical front-end for RAxML.
+# raxmlGUI 1.31 build 20131206. A graphical front-end for RAxML.
 # Created by Daniele Silvestro and Ingo Michalak on 19/05/2010. => dsilvestro@senckenberg.de
 try:
 	import sys
@@ -176,7 +176,7 @@ def delete():
 	texxt.delete("1.0", END)
 	texxt.config(state=DISABLED)
 	update_menu('clear')
-	try: button2.config(highlightbackground = col, text='Load alignment', padx=20, pady=2, command=lambda: open('1'))
+	try: button2.config(highlightbackground = col, text='Load alignment', padx=20, pady=2, command=lambda: open_ali('1'))
 	except: pass
 	out_list=list()
 	try: del numchar
@@ -202,6 +202,7 @@ def delete():
 	button2.config(state=NORMAL)
 	button5.config(state=DISABLED)
 	button6.config(state=DISABLED)
+	button7.config(state=DISABLED)
 	outfile.set('outfile')
 	part_ff=part_f=const_f=fileSafe= ""
 	outfileP = "%s/part.txt" % self_path
@@ -234,7 +235,7 @@ def export():
 			sv_file.write(filecontents)
 			sv_file.close()
 			fileinputS = sv_file
-			open(svname)
+			open_ali(svname)
 		else: pass
 	except: pass
 		
@@ -333,14 +334,15 @@ def mod_tools():
 	model = StringVar()
 	opt3 = apply(OptionMenu, (frameM, model) + tuple(listM[::1]))
 	opt3.pack(side=LEFT)
-	opt3.config(bg = col)
+	opt3.config(bg = col, width=max(len(w) for w in listM)+3)
+	#opt3.pack_propagate(0)
 	model.set(listM[0])  #(K[2])
 	Imodel = StringVar()
 	if dtype== "AA":
 		modelAA = StringVar()
 		opt1 = apply(OptionMenu, (frameM, modelAA) + tuple(listMAA[::1]))
 		opt1.pack(side=LEFT)
-		opt1.config(bg = col)#, width =7)
+		opt1.config(bg = col, width=max(len(w) for w in listMAA)+3)#, width =7)
 		modelAA.set(listMAA[0])  #(K[2])
 		checkM = Checkbutton(frameM, text="Emp. Freq. ", variable=Imodel, onvalue="F", offvalue=" ")
 		checkM.pack(side=LEFT)
@@ -350,7 +352,7 @@ def mod_tools():
 		modelMU = StringVar()
 		opt1 = apply(OptionMenu, (frameM, modelMU) + tuple(listMMU[::1]))
 		opt1.pack(side=LEFT)
-		opt1.config(bg = col)
+		opt1.config(bg = col, width=max(len(w) for w in listMMU)+3)
 		modelMU.set(listMMU[0])  #(K[2])
 	try:
 		button2.config(highlightbackground = col, text='Add alignment', pady=2, command=add_align)
@@ -414,10 +416,13 @@ def taxa_list(s):
 		outg.set(R[1]) # default value is the first taxon
 		button5.config(state=NORMAL)   # RUN RAXML
 		button6.config(state=NORMAL)   # CLEAR
+		button7.config(state=NORMAL)   # RUN CIPRES
 		#print "NEWTAXA:", numtaxa, numchar
 	elif replicate.get() == 'Ancestral states':
 		try:
-			if rooted_tree !=0: button5.config(state=NORMAL)
+			if rooted_tree !=0: 
+				button5.config(state=NORMAL)
+				button7.config(state=NORMAL)   # RUN RAXML
 		except: pass
 		button6.config(state=NORMAL)   # CLEAR
 	if replicate.get() == 'Pairwise distances': opt5.config(state=NORMAL)
@@ -633,7 +638,7 @@ def add_align():
 		taxa_list(s)
 	except(NameError): pass
 		
-def open(open_arg):
+def open_ali(open_arg):
 	print open_arg
 	global fileinputS, seq_file, path_dir, s, shortpath, seq_f, path_d, shortpath, ndata, numchar, part_L, fileSafe
 	if open_arg=='1' or open_arg=='self': (fileinputS) = askopenfilename(title="Load alignment", parent=self)
@@ -1096,30 +1101,85 @@ def run(argument):
 		out_file2 = "%sB" % outfile.get()
 		pro = "-T %s" % proc.get()
 		# DEFINING THE SUBSTITUTION MODEL
+		if argument=="run_CIPRES":
+			def parse_model_inv(model_get):
+				if "MULTI" in model_get:
+					model_get=model_get.split("MULTI")[1]
+					add_multi=1
+				else: add_multi=0
+				if "BIN" in model_get:
+					model_get=model_get.split("BIN")[1]
+					add_bin=1
+				else: add_bin=0
+				subs_model= model_get.split("I")[0]
+				print "\n\n\n\n\n",model_get,"\n\n\n\n\n"
+				
+				if model_get.endswith("I"): res= [subs_model,"invariable_=I\n"] # check if correct syntax #####editIM: now it's correct
+				else: res= [subs_model,"invariable_= \n"]
+				if add_multi==1: res[0]= "%s%s" % ("MULTI",res[0]) 
+				if add_bin==1: res[0]= "%s%s" % ("BIN",res[0]) 
+				return res
 			
-		mod = "-m %s" % (model.get())
+			model_get=model.get()
+			parsed_model_get=parse_model_inv(model_get)
+			if dtype == "DNA":
+				mod  = "datatype_=dna\n" # WHAT ABOUT RNA??
+				mod += "dna_gtrcat_=%s\n" % parsed_model_get[0]
+			if dtype == "AA":
+				mod  = "datatype_=protein\n" 
+				mod += "prot_matrix_spec_=%s\n" % (modelAA.get())
+				if Imodel.get()== 'F' and 'GTR' not in modelAA.get(): mod += "use_emp_freqs_=T\n" # check if correct syntax ###editIM: now it is ;)
+				else: mod += "use_emp_freqs_=F\n"
+				mod += "prot_sub_model_=%s\n" % (parsed_model_get[0])
+			if dtype == "MULTI":
+				mod  = "datatype_=multi\n" 
+				mod += "multi_model_=%s\n" % parsed_model_get[0]
+				mod += "choose_multi_model_=%s\n" % (modelMU.get())
+				# HOW DO WE ADD the -K (GTR,ORDERED,MK) OPTION??
+			if dtype == "BIN":
+				mod  = "datatype_=binary\n" 
+				mod += "bin_model_=%s\n" % parsed_model_get[0]
+			
+			# add invariant sites (0/1)
+			mod += parsed_model_get[1]	
+				
+		#	other model options:
+		#	If not DNA , set datatype_=(protein/rna/binary/multi) then set this parameter
+		#	(GTRCAT default;  prot_sub_model_=PROTGAMMA/PROTCAT; rna_model_ ;bin_model_=BINCAT/BINGAMMA; multi_model_=MULTICAT/MULTIGAMMA)
+		#	Then set sub_parameters for protein:
+		#	prot_matrix_spec_= (DAYHOFF is default)
+                        #
+		#	other modifiers can be set:
+		#	invariable_= - switch - Estimate proportion of invariable sites (GTRGAMMA + I)
+		#	ascertainment_= switch -
+		#	ascertainment_corr_= excl - sets the kind of correction used
+		#	use_emp_freqs_= to use empirical frequencies, protein only
+			
+			
+		else:	
+			mod = "-m %s" % (model.get())
 
-		if "GAMMA" in model.get() or "CAT" in model.get(): pass
-		else:
-			if model.get() in ['PROT', 'GTR', 'MULTI', 'BIN']:
-				mod= "-V " + mod + "CAT"
+			if "GAMMA" in model.get() or "CAT" in model.get(): pass
 			else:
-				if 'PROT' in model.get(): mod='-m PROT'
-				elif 'GTR' in model.get(): mod='-m GTR'
-				elif 'MULTI' in model.get(): mod='-m MULTI'
-				elif 'BIN' in model.get(): mod='-m BIN'
-				mod= "-V " + mod + "CATI"
+				if model.get() in ['PROT', 'GTR', 'MULTI', 'BIN']:
+					mod= "-V " + mod + "CAT"
+				else:
+					if 'PROT' in model.get(): mod='-m PROT'
+					elif 'GTR' in model.get(): mod='-m GTR'
+					elif 'MULTI' in model.get(): mod='-m MULTI'
+					elif 'BIN' in model.get(): mod='-m BIN'
+					mod= "-V " + mod + "CATI"
 
 
-		if dtype == "AA":
-			if modelAA.get() in ['GTR','GTR_UNLINKED'] and Imodel.get()== 'F': mod = "%s%s" % (mod, modelAA.get())
-			else: mod = "%s%s%s" % (mod, modelAA.get(), Imodel.get())
+			if dtype == "AA":
+				if modelAA.get() in ['GTR','GTR_UNLINKED'] and Imodel.get()== 'F': mod = "%s%s" % (mod, modelAA.get())
+				else: mod = "%s%s%s" % (mod, modelAA.get(), Imodel.get())
 
-		if dtype == "DNA" or dtype == "MIXED": # SECONDARY STRUCTURE
-			try: mod = """%s -S "%s" -A %s""" % (mod, II_file, IIstr.get())
-			except: pass
-		if dtype == "MULTI" or Mdtype=="MMulti":
-			mod = "%s -K %s" % (mod, modelMU.get())
+			if dtype == "DNA" or dtype == "MIXED": # SECONDARY STRUCTURE
+				try: mod = """%s -S "%s" -A %s""" % (mod, II_file, IIstr.get())
+				except: pass
+			if dtype == "MULTI" or Mdtype=="MMulti":
+				mod = "%s -K %s" % (mod, modelMU.get())
 
 		
 		trees = """ "%s%s%s" """ % (path_dirsimple, "RAxML_bootstrap.", out_file1)
@@ -1154,111 +1214,235 @@ def run(argument):
 
 		msg6=0
 		global rooted_tree
-		if replicate.get() == 'Ancestral states':			### AncStates ###
-			msg6=1
-			out_file = "%s" % outfile.get()
-			cmd = """cd %s %s &&%s %s -f A -t "%s" -s %s %s -n %s -O -w %s %s %s""" \
-			% (winD, raxml_path, K[0], pro, rooted_tree, seq_file, mod, out_file, path_dir, part_f, winEx)
 		
-		if replicate.get() == 'Pairwise distances':
-			# "./raxmlHPC -f x -m GTRGAMMA[I] -n NAME -s INPUT -p RANDOMNR [-q PARTFILE -o OUTGROUP]"
-			cmd = """cd %s %s &&%s %s -f x -p %s %s -s %s %s -n %s %s -O -w %s %s %s""" \
-			% (winD, raxml_path, K[0], pro, seed_1, const_f, seq_file, mod, out_file, o, path_dir, part_f, winEx)
 		
-		if replicate.get() == 'ML + rapid bootstrap':			### rapid BS ###
-			cmd= """cd %s %s&& %s %s %s -f a -x %s %s %s -p %s -N %s %s -s %s -n %s %s -O -w %s %s %s %s""" \
-% (winD, raxml_path, runWin, K[0], pro, seed_1, save_brL.get(),mod, seed_2, BSrep.get(), o, seq_file, out_file, \
-part_f, path_dir, const_f, result, winEx)
+		####### HERE STARTS the RUN CMD
+		
+		if argument=="run_CIPRES":
+			if current_OS == 'Windows': cp_cmd = "copy"
+			else: cp_cmd = "cp"
+			# create raxml_gui directory
+			path_dir_cipres = "%s%s/" % (path_dirsimple,"raxmlgui_cipres")
+			os.system("mkdir %s" % path_dir_cipres)
 
-		elif replicate.get() == 'ML + thorough bootstrap':		### throrough BS ###
-			cmd= """cd %s %s \
-&&%s %s -b %s %s %s -p %s -N %s %s -s %s -n %s %s -w %s %s -O && cd %s \
-&&%s %s -f d %s %s -s %s -N %s -n %s %s -w %s %s -p %s -O && cd %s \
-&&%s %s -f b -t %s -z %s %s -s %s -n %s -w %s %s -O %s""" \
-% (winD, raxml_path, K[0], pro, seed_1, mod, save_brL.get(),seed_2, BSrep.get(), o, seq_file, out_file1, part_f, path_dir, const_f,\
-raxml_path, K[0], pro, mod, o, seq_file, BSrep2.get(), out_file2, part_f, path_dir, const_f,random.randrange(1, 1000, 1), \
-raxml_path, K[0], pro, MLtreeR, trees, mod, seq_file, out_file, path_dir, result, winEx)
+			def get_constraint(s): # topology, partitions, outgroup
+				type_of_constraint = s.split(" ")[0]
+				if type_of_constraint in ["-r","-g","-q","-o"]:
+					constr_file= s.split("%s " % (type_of_constraint))[1]
+					constr_file= constr_file.replace('"','')
+					return [type_of_constraint,constr_file]	
+				else:
+					return [0,0]
 
-			try:
-				remove="RAxML_info.%s.tre" % (only_name)
-				if current_OS == 'Windows': cmd= """cd "%s"&& del %s """ % (path_dirsimple, remove)
-				else: cmd= """cd "%s"&& rm %s """ % (path_dirsimple, remove)
+			def copy_file(file):
+				cmd = "%s %s %s" % (cp_cmd,file,path_dir_cipres)
 				os.system(cmd)
-			except: pass
 
-		elif replicate.get() == 'Bootstrap + consensus':		### only BS ###
-			msg6=2
-			if current_OS == 'Windows': remove_cmd= "del"
-			else: remove_cmd= "rm"
+			def write_to_file(text_str,file_name):
+				file="%s%s" % (path_dir_cipres,file_name)
+				newfile = open(file, "wb") 
+				newfile.writelines(text_str)
+				newfile.close()
+
+	
+			#__ prepare testInput.properties and copy input files
+			temp=os.path.basename(seq_file)
+			input_properties = "infile_=%s\n" % (temp.split('"')[0])
+			copy_file(seq_file)
+
+			[set_part,part_file] = get_constraint(part_f)
+			if set_part != 0: 
+				input_properties += "partition_=%s\n" % (os.path.basename(part_file))
+				copy_file(part_file)
+
+			[set_constr,constr_file] = get_constraint(const_f)
+			if set_constr != 0: 
+				if set_constr=="-r":
+					input_properties += "binary_backbone_=%s\n" % (os.path.basename(constr_file))
+				if set_constr=="-g": 
+					input_properties += "constraint_=%s\n" % (os.path.basename(constr_file))
+				copy_file(constr_file)
+
+			write_to_file(input_properties,"testInput.properties")
+
+
+			#__ prepare testParam.properties
+			# raxml ID
+			if replicate.get() in ["ML + thorough bootstrap","Bootstrap + consensus"]:
+				raxml_ID = "RAXMLHPC2_WORKFLOW"
+			else:
+				raxml_ID = "RAXMLHPC8_REST_XSEDE"	#RAXMLHPC2_TGB
+			param_properties =  "toolId=%s\n" % (raxml_ID)
 			
-			BStrees_file= """  "%sRAxML_bootstrap.%s"    """ % (path_dirsimple, out_file)
-			cmd= """cd %s %s \
-&& %s %s %s %s -n %s -s %s %s -x %s -N %s -w %s %s %s -p %s -O && cd %s\
-&& %s %s %s -n con.%s -J MR -z %s -w %s %s
-""" \
-% (winD, raxml_path, \
-K[0], pro, mod, save_brL.get(), out_file, seq_file, o, seed_1, BSrep.get(), path_dir, part_f, const_f, random.randrange(1, 1000, 1), raxml_path, \
-K[0], pro, mod, out_file, BStrees_file, path_dir, winEx)
+			
+			param_properties += "runtime_=0.50\n"
+			param_properties += "outsuffix_=%s\n" % (out_file)
+			param_properties += "disable_seqcheck_=1\n"
+			
+			# add data type and model
+			param_properties += mod
 
 
-		elif replicate.get() == 'ML search':			   ### only ML search ###
-			# calculate SH
-			if BSrep.get()=="sh":
-				intreefile2=""" "%s%s%s" """ % (path_dirsimple, "RAxML_bestTree.", out_file)
-				cmd_temp2="""&& cd %s %s &&%s %s -f J %s -t %s -n sh.%s -s %s -w %s %s -O""" \
-				% (winD, raxml_path, K[0], pro, mod , intreefile2, out_file, seq_file, path_dir, part_f)
-				MLout="RAxML_bestTree.sh."+out_file
-			else: 
-				cmd_temp2=""
-				MLout="RAxML_bestTree."+out_file
-			#&& cd /D USERSFOLDER && type RAxML_result.INPUTNAME* > combinedresults.INPUTNAME.trees
-			#&& cd USERSFOLDER && cat RAxML_result.INPUTNAME* > combinedresults.INPUTNAME.trees
-			if save_brL.get()=="brl":
-				if current_OS == 'Windows': 
-					combine_trees="&& cd /D %s && type RAxML_result.%s* > combined_results.%s" % (path_dir, out_file, out_file)
-				else: combine_trees="&& cd %s && cat RAxML_result.%s* > combined_results.%s" % (path_dir, out_file, out_file)
-				MLout="combined_results"+out_file
-			else: combine_trees=""
+			[set_outgroup,outgroup_name] = get_constraint(o)
+			if set_outgroup != 0: 
+				param_properties += "outgroup_=%s\n" % (outgroup_name)
+
+			#__ analysis-specific parameters
+			
+			#### 'ML + rapid bootstrap' ####
+			if replicate.get() == 'ML + rapid bootstrap':	
+				param_properties += "select_analysis_ =fa\nchoose_bootstrap_=x\n"
+				try: 
+					int(BSrep.get())
+					param_properties += "choose_bootstop_=specify\n"
+					param_properties += "bootstrap_value_=%s\n" % (int(BSrep.get())) #bootstrap_value_integer
+
+				except(ValueError): # BOOTSTOPPING
+					param_properties += "choose_bootstop_=bootstop\n"
+					param_properties += "bootstopping_type_=%s\n" % (BSrep.get())
+					
+				param_properties += "seed_value_=%s\nparsimony_seed_val_=%s" % (seed_1,seed_2) #bootstrap_seed_val_
+
+			
+			
+			elif replicate.get() == 'ML + thorough bootstrap': pass
+			# raxml_ID = "RAXMLHPC2_WORKFLOW" for FTS,BOOTCON,MLS,MLTB			
+			# specify_workflow_=FTS,BOOTCON,MLS,MLTB
 
 
-			MLtree = "%s%s%s" % (path_dir, "RAxML_result.", out_file)
-			cmd= """cd %s %s&&%s %s -f d %s -N %s -O -p %s %s -s %s -n %s %s -w %s %s %s %s %s %s""" \
-% (winD, raxml_path, K[0], pro, mod, BSrep2.get(), random.randrange(1, 1000, 1), o, seq_file, out_file, part_f, path_dir, const_f, result2, cmd_temp2, combine_trees, winEx)
+			write_to_file(param_properties,"testParam.properties")
+			print "\n\ncreated input files in directory: %s\n\n" % (path_dir_cipres)
+			
+			#### CHECK THIS LATER
+			check_run=1
+			if check_run==1:
+				if 2>1: #try:
+					import python_cipres.commands as CipresCommands
+					CipresCommands.tooltest([0,path_dir_cipres,"validate"])
+					print "EVERYTHING SEEMS TO WORK!"
+					print "Starting run..."
+					cmd = 'CipresCommands.tooltest([0,path_dir_cipres,"run"])'
+					
+						
+					
+				#except: 
+				#	print "SOMETHING DIDN'T WORK :("
+				#	print path_dir_cipres,"run"
+			#	
+			#	
+			#	
+			#	cmd = """ "python tooltest.py"    """
+			#else:
+			#	cmd = """ "~/cipres/tooltest.py"  path_dir_cipres run """
+			
+		
+		else:
+		
+			if replicate.get() == 'Ancestral states':			### AncStates ###
+				msg6=1
+				out_file = "%s" % outfile.get()
+				cmd = """cd %s %s &&%s %s -f A -t "%s" -s %s %s -n %s -O -w %s %s %s""" \
+				% (winD, raxml_path, K[0], pro, rooted_tree, seq_file, mod, out_file, path_dir, part_f, winEx)
+		
+			if replicate.get() == 'Pairwise distances':
+				# "./raxmlHPC -f x -m GTRGAMMA[I] -n NAME -s INPUT -p RANDOMNR [-q PARTFILE -o OUTGROUP]"
+				cmd = """cd %s %s &&%s %s -f x -p %s %s -s %s %s -n %s %s -O -w %s %s %s""" \
+				% (winD, raxml_path, K[0], pro, seed_1, const_f, seq_file, mod, out_file, o, path_dir, part_f, winEx)
+		
+			if replicate.get() == 'ML + rapid bootstrap':			### rapid BS ###
+				cmd= """cd %s %s&& %s %s %s -f a -x %s %s %s -p %s -N %s %s -s %s -n %s %s -O -w %s %s %s %s""" \
+	% (winD, raxml_path, runWin, K[0], pro, seed_1, save_brL.get(),mod, seed_2, BSrep.get(), o, seq_file, out_file, \
+	part_f, path_dir, const_f, result, winEx)
+
+			elif replicate.get() == 'ML + thorough bootstrap':		### throrough BS ###
+				cmd= """cd %s %s \
+	&&%s %s -b %s %s %s -p %s -N %s %s -s %s -n %s %s -w %s %s -O && cd %s \
+	&&%s %s -f d %s %s -s %s -N %s -n %s %s -w %s %s -p %s -O && cd %s \
+	&&%s %s -f b -t %s -z %s %s -s %s -n %s -w %s %s -O %s""" \
+	% (winD, raxml_path, K[0], pro, seed_1, mod, save_brL.get(),seed_2, BSrep.get(), o, seq_file, out_file1, part_f, path_dir, const_f,\
+	raxml_path, K[0], pro, mod, o, seq_file, BSrep2.get(), out_file2, part_f, path_dir, const_f,random.randrange(1, 1000, 1), \
+	raxml_path, K[0], pro, MLtreeR, trees, mod, seq_file, out_file, path_dir, result, winEx)
+
+				try:
+					remove="RAxML_info.%s.tre" % (only_name)
+					if current_OS == 'Windows': cmd= """cd "%s"&& del %s """ % (path_dirsimple, remove)
+					else: cmd= """cd "%s"&& rm %s """ % (path_dirsimple, remove)
+					os.system(cmd)
+				except: pass
+
+			elif replicate.get() == 'Bootstrap + consensus':		### only BS ###
+				msg6=2
+				if current_OS == 'Windows': remove_cmd= "del"
+				else: remove_cmd= "rm"
+			
+				BStrees_file= """  "%sRAxML_bootstrap.%s"    """ % (path_dirsimple, out_file)
+				cmd= """cd %s %s \
+	&& %s %s %s %s -n %s -s %s %s -x %s -N %s -w %s %s %s -p %s -O && cd %s\
+	&& %s %s %s -n con.%s -J MR -z %s -w %s %s
+	""" \
+	% (winD, raxml_path, \
+	K[0], pro, mod, save_brL.get(), out_file, seq_file, o, seed_1, BSrep.get(), path_dir, part_f, const_f, random.randrange(1, 1000, 1), raxml_path, \
+	K[0], pro, mod, out_file, BStrees_file, path_dir, winEx)
+
+
+			elif replicate.get() == 'ML search':			   ### only ML search ###
+				# calculate SH
+				if BSrep.get()=="sh":
+					intreefile2=""" "%s%s%s" """ % (path_dirsimple, "RAxML_bestTree.", out_file)
+					cmd_temp2="""&& cd %s %s &&%s %s -f J %s -t %s -n sh.%s -s %s -w %s %s -O""" \
+					% (winD, raxml_path, K[0], pro, mod , intreefile2, out_file, seq_file, path_dir, part_f)
+					MLout="RAxML_bestTree.sh."+out_file
+				else: 
+					cmd_temp2=""
+					MLout="RAxML_bestTree."+out_file
+				#&& cd /D USERSFOLDER && type RAxML_result.INPUTNAME* > combinedresults.INPUTNAME.trees
+				#&& cd USERSFOLDER && cat RAxML_result.INPUTNAME* > combinedresults.INPUTNAME.trees
+				if save_brL.get()=="brl":
+					if current_OS == 'Windows': 
+						combine_trees="&& cd /D %s && type RAxML_result.%s* > combined_results.%s" % (path_dir, out_file, out_file)
+					else: combine_trees="&& cd %s && cat RAxML_result.%s* > combined_results.%s" % (path_dir, out_file, out_file)
+					MLout="combined_results"+out_file
+				else: combine_trees=""
+
+
+				MLtree = "%s%s%s" % (path_dir, "RAxML_result.", out_file)
+				cmd= """cd %s %s&&%s %s -f d %s -N %s -O -p %s %s -s %s -n %s %s -w %s %s %s %s %s %s""" \
+	% (winD, raxml_path, K[0], pro, mod, BSrep2.get(), random.randrange(1, 1000, 1), o, seq_file, out_file, part_f, path_dir, const_f, result2, cmd_temp2, combine_trees, winEx)
 			
 
 
 
-		elif replicate.get() == 'Fast tree search':		### fast Tree search ###
-			# calculate brL 
-			if save_brL.get()=="brl":
-				msg6=4
-				intreefile1=""" "%s%s%s" """ % (path_dirsimple, "RAxML_fastTree.", out_file)
-				cmd_temp1="""&& cd %s %s &&%s %s -f e %s -t %s -n brL.%s -s %s -w %s %s -O""" \
-				% (winD, raxml_path, K[0], pro, mod, intreefile1, out_file, seq_file, path_dir, part_f)
-			else: cmd_temp1=""
+			elif replicate.get() == 'Fast tree search':		### fast Tree search ###
+				# calculate brL 
+				if save_brL.get()=="brl":
+					msg6=4
+					intreefile1=""" "%s%s%s" """ % (path_dirsimple, "RAxML_fastTree.", out_file)
+					cmd_temp1="""&& cd %s %s &&%s %s -f e %s -t %s -n brL.%s -s %s -w %s %s -O""" \
+					% (winD, raxml_path, K[0], pro, mod, intreefile1, out_file, seq_file, path_dir, part_f)
+				else: cmd_temp1=""
 			
-			# calculate SH
-			if BSrep.get()=="sh":
-				if save_brL.get()=="brl": intreefile2=""" "%s%s%s" """ % (path_dirsimple, "RAxML_result.brL.", out_file)
-				else: intreefile2=""" "%s%s%s" """ % (path_dirsimple, "RAxML_fastTree.", out_file)
+				# calculate SH
+				if BSrep.get()=="sh":
+					if save_brL.get()=="brl": intreefile2=""" "%s%s%s" """ % (path_dirsimple, "RAxML_result.brL.", out_file)
+					else: intreefile2=""" "%s%s%s" """ % (path_dirsimple, "RAxML_fastTree.", out_file)
 
-				cmd_temp2="""&& cd %s %s &&%s %s -f J %s -t %s -n sh.%s -s %s -w %s %s -O""" \
-				% (winD, raxml_path, K[0], pro, mod , intreefile2, out_file, seq_file, path_dir, part_f)
-				msg6=3
-			else: cmd_temp2=""
+					cmd_temp2="""&& cd %s %s &&%s %s -f J %s -t %s -n sh.%s -s %s -w %s %s -O""" \
+					% (winD, raxml_path, K[0], pro, mod , intreefile2, out_file, seq_file, path_dir, part_f)
+					msg6=3
+				else: cmd_temp2=""
 
-			if cmd_temp1=="" and cmd_temp2=="": msg6=5
+				if cmd_temp1=="" and cmd_temp2=="": msg6=5
 
-			cmd= """cd %s %s &&%s %s -f E -p %s %s -n %s -s %s -O -w %s %s %s %s %s""" \
-				% (winD, raxml_path, K[0], pro, seed_1, mod, out_file, seq_file, path_dir, part_f, cmd_temp1,cmd_temp2, winEx)
+				cmd= """cd %s %s &&%s %s -f E -p %s %s -n %s -s %s -O -w %s %s %s %s %s""" \
+					% (winD, raxml_path, K[0], pro, seed_1, mod, out_file, seq_file, path_dir, part_f, cmd_temp1,cmd_temp2, winEx)
 
-#&& cd %s \
+	#&& cd %s \
 
-#&&%s %s -f d %s %s -s %s -N %s -n %s %s -w %s %s -p %s && cd %s \
-#&&%s %s -f b -t %s -z %s %s -s %s -n %s -w %s %s %s""" 
-#% (winD, raxml_path, K[0], pro, seed_1, mod, save_brL.get(),seed_2, BSrep.get(), o, seq_file, out_file1, part_f, path_dir, const_f,\
-#raxml_path, K[0], pro, mod, o, seq_file, BSrep2.get(), out_file2, part_f, path_dir, const_f,random.randrange(1, 1000, 1), \
-#raxml_path, K[0], pro, MLtreeR, trees, mod, seq_file, out_file, path_dir, result, winEx)
+	#&&%s %s -f d %s %s -s %s -N %s -n %s %s -w %s %s -p %s && cd %s \
+	#&&%s %s -f b -t %s -z %s %s -s %s -n %s -w %s %s %s""" 
+	#% (winD, raxml_path, K[0], pro, seed_1, mod, save_brL.get(),seed_2, BSrep.get(), o, seq_file, out_file1, part_f, path_dir, const_f,\
+	#raxml_path, K[0], pro, mod, o, seq_file, BSrep2.get(), out_file2, part_f, path_dir, const_f,random.randrange(1, 1000, 1), \
+	#raxml_path, K[0], pro, MLtreeR, trees, mod, seq_file, out_file, path_dir, result, winEx)
 
 
 
@@ -1310,9 +1494,9 @@ K[0], pro, mod, out_file, BStrees_file, path_dir, winEx)
 			self_1.bind("<Escape>", close_cmd)
 			self_1.bind("<Command-w>", close_cmd)
 			if current_OS=='Windows': self_1.bind("<Control-w>", close_cmd)
-	
 
-		if argument=="r":
+
+		if argument=="r" or argument=="run_CIPRES":
 			if current_OS == 'MacOS' or current_OS == 'Linux':
 				try:
 					try:
@@ -1357,7 +1541,7 @@ K[0], pro, mod, out_file, BStrees_file, path_dir, winEx)
 		infofile = """ "%s%s%s" """ % (path_dirsimple, "RAxML_info.", out_file)
 		msg1="running RAxML...", msg5
 		msg1=list(msg1)
-		
+	
 		if argument=="r":			
 			update_bar(msg1[0])
 			self.after(1000, lambda: update_bar(msg1[1]))
@@ -1379,6 +1563,7 @@ def open_rooted_tree():
 			if numtaxa>0:
 				print numtaxa
 				button5.config(state=NORMAL)
+				button7.config(state=NORMAL)
 		shortpathconstr = os.path.basename(rooted_tree)
 		f_root = Tkinter.Frame(framme, relief=FLAT, borderwidth=1)
 		f_root.pack(fill=X, expand=NO, side=LEFT)
@@ -1462,10 +1647,13 @@ def import_fasta():
 						outg.set(R[1]) # default value is the first taxon
 						button5.config(state=NORMAL)   # RUN RAXML
 						button6.config(state=NORMAL)   # CLEAR
+						button7.config(state=NORMAL)
 						#print "NEWTAXA:", numtaxa, numchar
 					elif replicate.get() == 'Ancestral states':
 						try:
-							if rooted_tree !=0: button5.config(state=NORMAL)
+							if rooted_tree !=0: 
+								button5.config(state=NORMAL)
+								button7.config(state=NORMAL)
 						except: pass
 						button6.config(state=NORMAL)   # CLEAR
 					if replicate.get() == 'Pairwise distances': opt5.config(state=NORMAL)
@@ -1505,7 +1693,7 @@ def convert_matrix(arg):
 						nex.write_to_path(svname, 'phylip', preserve_underscores=True)
 						#ans=askyesno("Load alignment", "Open new Phylip alignment? ", parent=self, default='yes')
 						#if ans: 
-						open(svname)
+						open_ali(svname)
 				except(dendropy.utility.error.DataParseError): showerror("Warning", """File format not recognized""", parent=self)
 				except: showerror("Warning", """File format not recognized""", parent=self)
 		if arg=='phy2nex':
@@ -1597,7 +1785,7 @@ except:
 	
 self = Tk()
 self.geometry("950x360")
-self.title( "raxmlGUI 1.3" )
+self.title( "raxmlGUI 1.5 alpha" )
 col = "#%s" % K[8]
 self.config(bg=col)
 self.minsize(900,320)
@@ -1619,7 +1807,7 @@ def open_short(a):
 	try: 
 		if fileSafe == "": raise
 		add_align()
-	except: open("1")
+	except: open_ali("1")
 if current_OS == 'MacOS': self.bind("<Command-o>", open_short)
 else: self.bind("<Control-o>", open_short)
 	
@@ -1699,19 +1887,19 @@ editmenu.add_separator()
 dtypeM=Menu(editmenu)
 if current_OS=='MacOS':
 	if weird_menu==1:
-		editmenu.add_command(label='Load alignment', command=lambda: open('1')) #, accelerator="Command-O") #command=open)
+		editmenu.add_command(label='Load alignment', command=lambda: open_ali('1')) #, accelerator="Command-O") #command=open)
 		editmenu.add_command(label='Add new alignment', command=add_align,state=DISABLED)# ,accelerator="O")
 		utimenu.add_command(label='Import NEXUS file', command=lambda: convert_matrix('nex2phy'))
 		editmenu.add_command(label='Import FASTA file', command=import_fasta)
 
 	else:
-		editmenu.add_command(label='Load alignment', command=lambda: open('1'), accelerator="Command-O") #command=open)
+		editmenu.add_command(label='Load alignment', command=lambda: open_ali('1'), accelerator="Command-O") #command=open)
 		editmenu.add_command(label='Add new alignment', command=add_align,state=DISABLED,accelerator="Command-O")
 		editmenu.add_command(label='Import NEXUS file', command=lambda: convert_matrix('nex2phy'), accelerator="Command-N")
 		editmenu.add_command(label='Import FASTA file', command=import_fasta, accelerator="Command-F")
 
 else:
-	editmenu.add_command(label='Load alignment', command=lambda: open('1'), accelerator="Ctrl+O") #command=open)
+	editmenu.add_command(label='Load alignment', command=lambda: open_ali('1'), accelerator="Ctrl+O") #command=open)
 	editmenu.add_command(label='Add new alignment', command=add_align,state=DISABLED,accelerator="Ctrl+O")
 	editmenu.add_command(label='Import NEXUS file', command=lambda: convert_matrix('nex2phy'), accelerator="Ctrl+N")
 	editmenu.add_command(label='Import FASTA file', command=import_fasta, accelerator="Ctrl+F")
@@ -1864,7 +2052,7 @@ v = IntVar()
 Label(frame, text=' ', bg = col).pack(side=LEFT) 
 button2 = Button(frame) # Load alignment
 button2.pack(side=LEFT)
-button2.config(highlightbackground = col, text='Load alignment', padx=20, pady=2, command=lambda: open('1'))
+button2.config(highlightbackground = col, text='Load alignment', padx=20, pady=2, command=lambda: open_ali('1'))
 
 frrr = Frame(frame)
 frrr.pack(fill=X, expand=NO, side=LEFT)
@@ -1882,6 +2070,9 @@ outfile.set('outfile')
 button5 = Button(frame, text='Run RAxML', padx=20, pady=2, command=lambda: run('r')) # RUN RAXML
 button5.pack(side=RIGHT)
 button5.config(highlightbackground = col, state=DISABLED)
+button7 = Button(frame, text='Cipres RAxML', padx=20, pady=2, command=lambda: run('run_CIPRES')) # RUN RAXML
+button7.pack(side=RIGHT)
+button7.config(highlightbackground = col, state=DISABLED)
 button6 = Tkinter.Button(frame, text='Clear', padx=15, pady=2, command=delete)
 button6.pack(side=RIGHT)
 button6.config(highlightbackground = col, state=DISABLED)
@@ -1889,6 +2080,7 @@ button6.config(highlightbackground = col, state=DISABLED)
 ### SECOND TOOLBAR
 def def_BS(a):
 	global BSrep, toolbR, save_brL, toolbR2, BSrep2
+	opt5.config(bg = col, width =len(str(a))+3)
 	if a=="User defined...":
 		try:
 			toolbR.destroy()
@@ -1935,6 +2127,7 @@ def def_ST(a):
 	
 def def_analysis(value):
 	global BSrep, opt5, listREP, toolbR, BSrep2, toolbR2, save_brL, button_load_tree
+	opt4.config(bg = col, width =len(str(value)))
 	try: toolbR.destroy()
 	except: pass
 	try: toolbR2.destroy()
@@ -1950,6 +2143,7 @@ def def_analysis(value):
 		try: frame3.destroy()
 		except: pass
 		button5.config(state=DISABLED)
+		button7.config(state=DISABLED)
 		#button6.config(state=DISABLED)
 		got='1'
 
@@ -1966,7 +2160,7 @@ def def_analysis(value):
 		#button5.config(state=DISABLED)
 		#button6.config(state=DISABLED)
 		boh.set('Maximum parsimony')
-		opt5.config(bg = col)
+		opt5.config(bg = col,width =len('Maximum parsimony'))
 		got='1'
 		try:
 			if fileinputS!="":
@@ -2028,7 +2222,7 @@ def def_analysis(value):
 		opt5 = OptionMenu(toolbR, BSrep,'100', '200', '500', '1000', '10000','autoMR', 'autoMRE', 'autoMRE_IGN', 'autoFC', 'User defined...', command=def_BS)
 		opt5.pack(side=LEFT)
 		BSrep.set(got)
-		opt5.config(bg = col)
+		opt5.config(bg = col, width =10)
 		try:
 			s = file(fileinputS,'r')
 			taxa_list(s)
@@ -2057,7 +2251,8 @@ def def_analysis(value):
 		opt6 = apply(OptionMenu, (toolbR2, BSrep2) + tuple(listREP2[::1]))
 		BSrep2.set(got)
 		opt6.pack(side=LEFT)
-		opt6.config(bg = col)#, width =1)
+		opt6.config(bg = col, width =5)
+		#opt6.config(bg = col)#, width =1)
 		
 	
 toolb = Frame(fram)
@@ -2077,7 +2272,7 @@ if K[3]=='rapid' or K[3] == 'thorough':
 else: def_a="%s search" % K[3]
 replicate.set(def_a)
 if current_OS == 'Windows': opt4.config(bg = col, width =23)#, justify=RIGHT)
-else: 	opt4.config(bg = col)#, width =15)#, justify=RIGHT)
+else: opt4.config(bg = col, width =len(def_a))#, justify=RIGHT)
 def_analysis(replicate)
 
 def a_short(a):

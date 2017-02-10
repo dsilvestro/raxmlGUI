@@ -1,7 +1,6 @@
 #!/usr/bin/env python2.6
-# raxmlGUI 1.3.1 build 20141022. A graphical front-end for RAxML.
-# Created by Daniele Silvestro and Ingo Michalak on 19/05/2010. 
-# For bug reports and support contact raxmlGUI [dot] help [at] gmail [dot] com
+# raxmlGUI 0.93 build 20100730. A graphical front-end for RAxML.
+# Created by Daniele Silvestro on 19/05/2010. => dsilvestro@senckenberg.de
 
 import sys
 import os
@@ -160,10 +159,10 @@ def part():
 
 				if data_type.get() == 'AA':
 					data_typeAA = StringVar()
-					opt4 = OptionMenu(toolM, data_typeAA, 'BLOSUM62', 'DAYHOFF', 'DCMUT', 'JTT', 'MTREV', 'WAG', 'RTREV', 'CPREV', 'VT', 'MTMAM', 'LG', 'MTART', 'MTZOA', 'PMB', 'HIVB', 'HIVW', 'JTTDCMUT', 'FLU', 'DUMMY', 'DUMMY2', 'AUTO', 'LG4M', 'LG4X', 'PROT_FILE', 'GTR_UNLINKED', 'GTR')
+					opt4 = OptionMenu(toolM, data_typeAA, 'DAYHOFF', 'DCMUT', 'JTT', 'MTREV', 'WAG', 'RTREV', 'CPREV', 'VT', 'BLOSUM62', 'MTMAM', 'LG', 'GTR', 'MTART', 'MTZOA', 'PMB', 'HIVB', 'HIVW', 'JTTDCMUT', 'FLU')
 					opt4.grid(row=1,  column=4, sticky=W)
-					opt4.config(bg = "light Grey")#, width =7)
-					data_typeAA.set('BLOSUM62')
+					opt4.config(bg = "light Grey",width=len('JTTDCMUT')+3)#, width =7)
+					data_typeAA.set('DAYHOFF')
 					Imodel = StringVar()
 					check1 = Checkbutton(toolM, text="Emp. Freq.", variable=Imodel, onvalue="F", offvalue=" ")
 					check1.config(bg = "light Grey")
@@ -174,7 +173,7 @@ def part():
 					data_typeDNA = StringVar()
 					opt4 = OptionMenu(toolM, data_typeDNA, 'no codon', 'codon specific', '3rd codon') 
 					opt4.grid(row=1,  column=4, sticky=W, columnspan=2)
-					opt4.config(bg = "light Grey")#, width =10)
+					opt4.config(bg = "light Grey",width=len('codon_specific')+3)#, width =10)
 					data_typeDNA.set('no codon')
 				if data_type.get() == 'BIN' or data_type.get() == 'MULTI': #print data_type.get()
 					try: toolM.destroy()
@@ -188,7 +187,7 @@ def part():
 		#	Label(tool2, text=' ', bg = "light Grey").pack(side=LEFT)
 			opt4 = OptionMenu(self, data_type,'DNA', 'BIN', 'MULTI', 'AA', command=model)
 			opt4.grid(row=1,  column=0, sticky=W)
-			opt4.config(bg = "light Grey")#, width =4)
+			opt4.config(bg = "light Grey", width =8)
 			
 			data_type.set(Mdtype)
 			# PART NAME
@@ -332,9 +331,6 @@ def part():
 		self.wm_iconbitmap(icon) 
 		self.minsize(460,270)
 		self.maxsize(460,270)
-	elif platform.system() == "Linux":
-		self.minsize(590,270)
-		self.maxsize(590,270)
 	else:
 		self.minsize(590,250)
 		self.maxsize(590,250)

@@ -1,9 +1,7 @@
 #!/usr/bin/env python2.6
-# raxmlGUI 1.3.1 build 20141022. A graphical front-end for RAxML.
-# Created by Daniele Silvestro and Ingo Michalak on 19/05/2010. 
-# For bug reports and support contact raxmlGUI [dot] help [at] gmail [dot] com
-
-
+# raxmlGUI 1.0 build 20120121. A graphical front-end for RAxML.
+# Created by Daniele Silvestro on 19/05/2010. => dsilvestro@senckenberg.de
+# MULTIPLATFORM VERSION
 import sys
 import os #
 import os.path
@@ -53,23 +51,63 @@ def read_pref():
 
 def about():
 	read_pref()
-	raxmlGUIv="""   raxmlGUI v. 1.3.1"""
+	raxmlGUIv="""   raxmlGUI v. 1.5"""
 	message=    "Daniele Silvestro & Ingo Michalak"
-	def more():
-		more="""raxmlGUI 1.3.1 build 20141021\n\nContact: \nraxmlgui.help@gmail.com\n
-\nraxmlGUI:\nSilvestro and Michalak (ODE, 2012)\nRAxML:\nStamatakis (Bioinformatics, 2014)"""
+	def moore():
+		more="""raxmlGUI 1.5 beta 20140615\n\nContact: \nraxmlgui.help@gmail.com\n
+\nraxmlGUI:\nSilvestro and Michalak (Org Divers Evol, 2012)\nRAxML:\nStamatakis (Bioinformatics, 2006)
+CIPRES-REST: Miller et al. (Evol Bioinform, 2015)"""
 		showinfo("About raxmlGUI", more)
 		self.destroy()
 	#	grab.showinfo()
-	def moore():
-		self.minsize(360,485)
-		self.maxsize(360,485)
-		c = Frame(self)
-		c.pack(fill=X, expand=NO, side=TOP)
-		c.config(bg = "Grey", relief=FLAT)
-		#t = Text(c, padx=80, pady=80, height=1)
-		#m="iuhgfdsdfghbvc\nuhgvcxdfg"
-		#t.insert(END, m)
+	def more():
+				more="""
+CONTACTS: \nraxmlgui.help@gmail.com
+http://sourceforge.net/projects/raxmlgui/
+\nREFERENCES:
+raxmlGUI\nSilvestro and Michalak (Org Divers Evol, 2012)
+RAxML\nStamatakis (Bioinformatics, 2014)
+CIPRES-REST\nMiller et al. (Evol Bioinform, 2015)
+\nACKNOWLEDGMENTS:
+Thanks to Mark Miller and Terri Schwartz for the support 
+integrating the CIPRES-REST services within raxmlGUI.
+"""
+				def close_cmd(a=0): 
+					self_1.destroy()
+					self.destroy()
+				self_1 = Toplevel()
+				self_1.title( "raxmlGUI 1.5 beta 20140424" )
+				self_1.geometry( "450x200" )
+				self_1.minsize(450,200)
+				self_1.config(bg='light Grey')
+				self_1.grab_set()
+				if current_OS=='Windows':
+					icon = "%s/icon.ico" % self_path
+					self_1.wm_iconbitmap(icon)
+				b = Frame(self_1, relief=RAISED, borderwidth=1)
+				b.pack(fill=X, expand=NO, side=BOTTOM)
+				b.config(bg = "light Grey")
+				Label(b, text='  ', bg = "light Grey").pack(side=RIGHT)
+				setA = Button(b, text='Close', padx=25, pady=2 , command=close_cmd) #
+				setA.pack(side=RIGHT)
+				setA.config(highlightbackground = "light Grey")
+				texxt_1 = Text(self_1, padx=35, pady=0, width=20, height=10)
+				texxt_1.pack(side=TOP, expand=NO)#, fill=Y)
+				texxt_1.config(highlightthickness=0)                 
+				sbar = Scrollbar(self_1)
+				sbar.config(command=texxt_1.yview)                   
+				texxt_1.config(yscrollcommand=sbar.set)
+				sbar.pack(fill=Y, expand=YES)                                   
+				if current_OS=='MacOS' or current_OS=='Windows': texxt_1.config(relief=GROOVE, bg='#e6e6e6', fg= 'dark blue', font=(11), state=DISABLED)
+				else: texxt_1.config(relief=GROOVE, bg='#e6e6e6', fg= 'dark blue', font=(10), state=DISABLED)
+				texxt_1.pack(side=LEFT, expand=YES, fill=BOTH)
+				texxt_1.config(state=NORMAL)
+				texxt_1.insert(END, more)
+				texxt_1.config(state=DISABLED)
+				self_1.bind("<Escape>", close_cmd)
+				self_1.bind("<Command-w>", close_cmd)
+				if current_OS=='Windows': self_1.bind("<Control-w>", close_cmd)			
+				
 	global gif
 	self = Toplevel()
 	self.title( "About raxmlGUI" )
@@ -232,4 +270,53 @@ DOI = {10.1007/s13127-011-0056-0},
 		sv_file = file(svname, 'w')
 		sv_file.write(filecontents)		
 		
-		
+def beta_info(current_OS):
+	detailed_msg = """This is a beta version! 
+
+This version of raxmlGUI you can run your analyses (currently with limited
+functions) using the CIPRES Science Gateway (Miller et al. 2011) via the
+REST API (Miller et al. 2015). You will need to install the necessary
+python toolkit, kindly provided by Terri Schwartz from the SDSC and
+included in the package.
+
+Further details are provided in the updated manual. For additional info,
+suggestions, bug reports please contact us at raxmlgui.help@gmail.com.
+You can download previous stable versions orf raxmlGUI at
+http://sourceforge.net/projects/raxmlgui/files/.
+
+"""
+	self_1 = Toplevel()
+	try: self_1.wm_attributes('-topmost', 1)
+	except: pass
+	self_1.title( "raxmlGUI 1.5 beta 1" )
+	self_1.geometry( "565x230" )
+	self_1.minsize(565,230)
+	self_1.config(bg='light Grey')
+	self_1.grab_set()
+	if current_OS=='Windows':
+		icon = "%s/icon.ico" % self_path
+		self_1.wm_iconbitmap(icon)
+	b = Frame(self_1, relief=RAISED, borderwidth=1)
+	b.pack(fill=X, expand=NO, side=BOTTOM)
+	b.config(bg = "light Grey")
+	Label(b, text='  ', bg = "light Grey").pack(side=RIGHT)
+	setA = Button(b, text='Close', padx=25, pady=2 , command=self_1.destroy) #
+	setA.pack(side=RIGHT)
+	setA.config(highlightbackground = "light Grey")
+	texxt_1 = Text(self_1, padx=35, pady=0, width=20, height=10)
+	texxt_1.pack(side=TOP, expand=NO)#, fill=Y)
+	texxt_1.config(highlightthickness=0)                 
+	sbar = Scrollbar(self_1)
+	sbar.config(command=texxt_1.yview)                   
+	texxt_1.config(yscrollcommand=sbar.set)
+	sbar.pack(fill=Y, expand=YES)                                   
+	if current_OS=='MacOS' or current_OS=='Windows': texxt_1.config(relief=GROOVE, bg='#e6e6e6', fg= 'dark blue', font=(15), state=DISABLED)
+	else: texxt_1.config(relief=GROOVE, bg='#e6e6e6', fg= 'dark blue', font=('Monaco', 12), state=DISABLED)
+	texxt_1.pack(side=LEFT, expand=YES, fill=BOTH)
+	texxt_1.config(state=NORMAL)
+	texxt_1.insert(END, detailed_msg)
+	texxt_1.config(state=DISABLED)
+	def close_cmd(a): self_1.destroy()
+	self_1.bind("<Escape>", close_cmd)
+	self_1.bind("<Command-w>", close_cmd)
+	if current_OS=='Windows': self_1.bind("<Control-w>", close_cmd)	

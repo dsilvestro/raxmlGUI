@@ -1,0 +1,14 @@
+README.txt
+setup.py
+bin/cipresjob.py
+bin/tooltest.py
+python_cipres/__init__.py
+python_cipres/client.py
+python_cipres/commands.py
+python_cipres/pyjavaproperties.py
+python_cipres.egg-info/PKG-INFO
+python_cipres.egg-info/SOURCES.txt
+python_cipres.egg-info/dependency_links.txt
+python_cipres.egg-info/not-zip-safe
+python_cipres.egg-info/requires.txt
+python_cipres.egg-info/top_level.txt

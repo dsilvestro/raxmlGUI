@@ -1,7 +1,6 @@
 #!/usr/bin/env python2.6
-# raxmlGUI 1.3.1 build 20141022. Set options and run a fully custom RAxML analysis
-# Created by Daniele Silvestro and Ingo Michalak on 19/05/2010
-
+# RAxMLGUI 0.9 build 20100519. Set options and run a fully custom RAxML analysis
+# Created by Daniele Silvestro on 20/01/2010. => dsilvestro@senckenberg.de
 
 import sys
 import os
@@ -59,9 +58,9 @@ Wrap_line: none"""
 def setOSauto():
 	print detectedOS
 	if detectedOS == 'MacOS' or detectedOS == 'Windows' or detectedOS == 'Linux':
-		if detectedOS == 'Windows': binary = "_8026_x64.exe"
+		if detectedOS == 'Windows': binary = "_8121.exe"
 		if detectedOS == 'MacOS': binary = "-SSE3-Mac"
-		if detectedOS == 'Linux': binary = "-SSE3-Linux"
+		if detectedOS == 'Linux': binary = "_8121_Ubuntu"
 		
 		outfile = "%s/defaults" % self_path
 		outfile = file(outfile, 'w')
@@ -71,8 +70,8 @@ def setOSauto():
 			import multiprocessing
 			nthr = multiprocessing.cpu_count()
 			if nthr>2:
-				#if detectedOS == 'MacOS': binary = "-PTHREADS-SSE3-Mac"
-				if detectedOS == 'Windows': binary = "-PTHREADS-SSE3_8026_x64.exe"
+				if detectedOS == 'MacOS': binary = "-PTHREADS-SSE3-Mac"
+				if detectedOS == 'Windows': binary = "-PTHREADS-SSE3_8121.exe"
 		except: pass
 		pref_def = """RAxML_version: raxmlHPC%s
 Number_processors: %s 
