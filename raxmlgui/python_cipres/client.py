@@ -1,68 +1,91 @@
 #!/usr/bin/env python
-import sys
+import getopt
 import os
 import re
+import shutil
 import string
 import subprocess
+import sys
 import tempfile
-import getopt
 import time
-import shutil
 import traceback
-import requests
 import xml.etree.ElementTree as ET
-import python_cipres.pyjavaproperties as Props
+
+import requests
+
+##import python_cipres.pyjavaproperties as Props ## commented by Madhu and replaced by following line
+import pyjavaproperties as Props
 
 # Flush stdout for debugging
 sys.stdout.flush()
 
 # Warning: you probably want to get rid of this line and follow the advice 
 # here https://urllib3.readthedocs.org/en/latest/security.html.
-try: requests.packages.urllib3.disable_warnings()
-except: pass
+requests.packages.urllib3.disable_warnings()
 
 # verbose is enabled/disabled via property file.  See main() below.
-verbose=False
+verbose = False
+
+
+def _prefixProperty(property, prefix):
+    if property.startswith(prefix):
+        return property
+    return "%s%s" % (prefix, property)
+
 
 class CipresError(Exception):
     def __init__(self, httpStatus, cipresCode, message, rawtext):
-        self.httpStatus = httpStatus 
+        self.httpStatus = httpStatus
         self.cipresCode = cipresCode
         self.message = message
         self.rawtext = rawtext
         super(CipresError, self).__init__(self.message)
 
+
 class ValidationError(CipresError):
     def __init__(self, httpStatus, cipresCode, message, fieldErrors, rawtext):
         super(ValidationError, self).__init__(httpStatus, cipresCode, message, rawtext)
         self.fieldErrors = fieldErrors
+
     def asString(self):
         str = self.message + "\n"
         for e in self.fieldErrors:
             str += "%s: %s\n" % (e, self.fieldErrors[e])
         return str
 
+
 class Client(object):
     global verbose
-    def __init__(self, appname, appID, username, password, baseUrl):
-        """ baseUrl is something like https://host/cipresrest/v1 """
+
+    def __init__(self, appname, appID, username, password, baseUrl, endUserHeaders=None):
+        """ baseUrl is something like https://host/cipresrest/v1 
+            endUserHeaders are for applications that use umbrella authentication only.
+        """
         self.appname = appname
         self.appID = appID
         self.username = username
         self.password = password
         self.baseUrl = baseUrl
-        self.headers = {'cipres-appkey': self.appID }
+        self.headers = {'cipres-appkey': self.appID}
+        if endUserHeaders:
+            self.endUsername = endUserHeaders.get('cipres-eu')
+            if not self.endUsername or not endUserHeaders.get('cipres-eu-email'):
+                raise Exception("endUserHeaders must include cipres-eu and cipres-eu-email")
+            self.headers.update(endUserHeaders)
+            self.endUsername = self.appname + "." + self.endUsername
+        else:
+            self.endUsername = self.username
 
     def listJobs(self):
         """ returns list of JobStatus objects """
-        r = self.__doGet__(url=self.baseUrl + "/job/" + self.username + "/?expand=true")
+        r = self.__doGet__(url=self.baseUrl + "/job/" + self.endUsername + "/?expand=true")
         return self.__parseJobList__(r.text)
 
     def getJobStatus(self, jobHandle):
         """ queries for status and returns JobStatus object """
-        return JobStatus(client=self, jobUrl=self.baseUrl + "/job/" + self.username + "/" + jobHandle)
+        return JobStatus(client=self, jobUrl=self.baseUrl + "/job/" + self.endUsername + "/" + jobHandle)
 
-    def submitJob(self, vParams, inputParams, metadata, validateOnly=False ):
+    def submitJob(self, vParams, inputParams, metadata, validateOnly=False):
         """ 
         Submits a job and returns a JobStatus object.   Raises ValidationException if submission isn't valid, 
         CipresException for other CIPRES problems (e.g. authorization, quotas), requests.exceptions.RequestException 
@@ -84,57 +107,60 @@ class Client(object):
         files = {}
         try:
             for key in inputParams:
-                paramname = "input.%s" % (key)
+                paramname = _prefixProperty(key, "input.")
                 pathname = inputParams[key]
                 files[paramname] = open(pathname, 'rb')
             payload = []
             if isinstance(vParams, dict):
                 for key in vParams:
-                    if key == "toolId":
+                    if key == "toolId" or key == "tool":
                         name = "tool"
                     else:
-                        name = "vparam.%s" % (key)
+                        name = _prefixProperty(key, "vparam.");
                     payload.append((name, vParams[key]))
             else:
                 for tuple in vParams:
-                    if tuple[0] == "toolId":
-                        name  = "tool"
+                    if tuple[0] == "toolId" or tuple[0] == "tool":
+                        name = "tool"
                     else:
-                        name = "vparam.%s" % (tuple[0])
+                        name = _prefixProperty(tuple[0], "vparam.")
                     payload.append((name, tuple[1]))
             if metadata:
                 for key in metadata:
-                    name = "metadata.%s" % (key)
+                    name = _prefixProperty(key, "metadata.");
                     payload.append((name, metadata[key]))
 
             if validateOnly:
-                url = self.baseUrl + "/job/" + self.username + "/validate"
+                url = self.baseUrl + "/job/" + self.endUsername + "/validate"
             else:
-                url = self.baseUrl + "/job/" + self.username
+                url = self.baseUrl + "/job/" + self.endUsername
 
-            response = requests.post(url, data=payload, files=files, auth=(self.username, self.password), headers=self.headers, verify=False)
+            print url ## Added by Madhu for testing
+
+            response = requests.post(url, data=payload, files=files, auth=(self.username, self.password),
+                                     headers=self.headers, verify=False)
             if verbose:
-                print "POSTED Payload of ", payload
-                print "POSTED file list of ", files
-                print "\n"
-                print "POST Status = %d" % ( response.status_code)
-                print "Response Content = %s" % (response.text)
+                print("POSTED Payload of ", payload)
+                print("POSTED file list of ", files)
+                print("\n")
+                print("POST Status = %d" % (response.status_code))
+                print("Response Content = %s" % (response.text))
 
             if response.status_code == 200:
-                return JobStatus(self, xml=ET.fromstring(response.text))
+                return JobStatus(self, xml=ET.fromstring(response.text.encode('utf-8')))
             else:
                 self.__raiseException__(response)
         finally:
-            for param, openfile in files.iteritems():
+            for param, openfile in files.items():
                 openfile.close
 
-    def validateJob(self, vParams, inputParams, metadata ):
+    def validateJob(self, vParams, inputParams, metadata):
         """ Validates a job and returns  a JobStatus object where commandline is the only field set. 
             If job isn't valid, raises a ValidationError.
         """
         return self.submitJob(vParams, inputParams, metadata, validateOnly=True)
 
-    def submitJobTemplate(self, testdir, metadata=None, validateOnly=False ):
+    def submitJobTemplate(self, testdir, metadata=None, validateOnly=False):
         """
         Same as submitJob except that instead of using vParams and inputParams dictionaries
         you supply the name of a "job template" directory that contains 2 properties files,
@@ -162,35 +188,35 @@ class Client(object):
             pathname = fileParams.getProperty(param)
             if not os.path.isabs(pathname):
                 pathname = os.path.join(testdir, os.path.basename(pathname))
-            fileParams[param] = pathname 
-        return self.submitJob(otherParams.getPropertyDictAsList(), fileParams.getPropertyDict(), metadata=metadata, validateOnly=validateOnly)
+            fileParams[param] = pathname
+        return self.submitJob(otherParams.getPropertyDictAsList(), fileParams.getPropertyDict(), metadata=metadata,
+                              validateOnly=validateOnly)
 
     def validateJobTemplate(self, testDir, metadata=None):
         return self.submitJobTemplate(testDir, metadata=metadata, validateOnly=True)
-
 
     def __raiseException__(self, response):
         """ Throws CipresException or ValidationException depending on the type of xml ErrorData 
         Cipres has returned. """
 
-        httpStatus = response.status_code 
+        httpStatus = response.status_code
         if response.text and len(response.text) > 0:
-            rawtext = response.text 
+            rawtext = response.text
         else:
-            rawtext = "No content returned." 
+            rawtext = "No content returned."
 
-        # Parse displayMessage, code and fieldErrors from response.text
+            # Parse displayMessage, code and fieldErrors from response.text
         displayMessage = None
-        cipresCode = 0 
+        cipresCode = 0
         fieldErrors = {}
         if response.text:
             try:
-                element = ET.fromstring(response.text) 
+                element = ET.fromstring(response.text.encode('utf8'))
                 if element.tag == "error":
                     displayMessage = element.find("displayMessage").text
                     cipresCode = int(element.find("code").text)
                     if (cipresCode == 5):
-                        for fieldError in element.findall("paramError"): 
+                        for fieldError in element.findall("paramError"):
                             fieldErrors[fieldError.find("param").text] = fieldError.find("error").text
             except Exception as e:
                 pass
@@ -204,41 +230,39 @@ class Client(object):
         else:
             raise CipresError(httpStatus, cipresCode, message, rawtext)
 
-
-    def __doGet__(self, url, stream=False ):
+    def __doGet__(self, url, stream=False):
         """ Returns xml text or throws a CipresError """
-        r = requests.get(url, auth=(self.username, self.password), verify=False, headers = self.headers, stream=stream);
+        r = requests.get(url, auth=(self.username, self.password), verify=False, headers=self.headers, stream=stream);
+        if verbose:
+            print("GET %s\nStatus = %d\nText:%s\n" % (url, r.status_code, r.text))
         if r.status_code != 200:
             self.__raiseException__(r);
-        if verbose:
-            print "GET %s\nStatus = %d\n" % (url, r.status_code)
         return r
 
     def __doDelete__(self, url):
         """ Returns nothing or throws a CipresError """
-        r = requests.delete(url, auth=(self.username, self.password), verify=False, headers = self.headers);
+        r = requests.delete(url, auth=(self.username, self.password), verify=False, headers=self.headers);
         if r.status_code != 200 and r.status_code != 204 and r.status_code != 202:
             self.__raiseException__(r)
         if verbose:
-            print "DELETE %s\nStatus = %d\nContent = %s" % (url, r.status_code, r.text)
+            print("DELETE %s\nStatus = %d\nContent = %s" % (url, r.status_code, r.text))
         return r
 
     def __parseJobList__(self, text):
         """ Converts xml job listing to a list of JobStatus object """
         jobList = []
-        et = ET.fromstring(text)
+        et = ET.fromstring(text.encode('utf-8'))
         for xmlJobStatus in et.find("jobs"):
             jobList.append(JobStatus(client=self, xml=xmlJobStatus))
         return jobList
-      
-        
+
 
 class JobStatus(object):
     """ Construct with jobUrl parameter and then call update() to fetch the status or construct with 
     xml parameter containing an element of type jobStatus and ctor will parse out the jobUrl """
 
     def __init__(self, client, jobUrl=None, xml=None):
-        self.client = client 
+        self.client = client
         self.jobUrl = jobUrl
         self.__clear__()
         if xml is not None:
@@ -254,9 +278,9 @@ class JobStatus(object):
         self.jobStage = None
         self.terminalStage = None
         self.failed = None
-        self.metadata = None
+        self.metadata = {}
         self.dateSubmitted = None
-        self.messages = [ ] 
+        self.messages = []
         self.commandline = None
 
     def __parseJobStatus__(self, xml):
@@ -272,7 +296,6 @@ class JobStatus(object):
             self.terminalStage = (xml.find("terminalStage").text == "true")
         if xml.find("failed") is not None:
             self.failed = (xml.find("failed").text == "true")
-            # self.metadata = 
         if xml.find("resultsUri") is not None:
             self.resultsUrl = xml.find("resultsUri").find("url").text
         if xml.find("workingDirUri") is not None:
@@ -283,12 +306,16 @@ class JobStatus(object):
         if xml.find("messages") is not None:
             for m in xml.find("messages"):
                 self.messages.append("%s: %s" % (m.find("timestamp").text, m.find("text").text))
+        if xml.find("metadata") is not None:
+            for e in xml.find("metadata").findall("entry"):
+                # for m in xml.find("entry"):
+                self.metadata[e.find("key").text] = e.find("value").text
 
     def show(self, messages=False):
         """ A debugging method to dump some of the content of this object to stdout """
 
         if not self.jobHandle and self.commandline:
-            print "Submission validated.  Commandline is: '%s'" % (self.commandline)
+            print("Submission validated.  Commandline is: '%s'" % (self.commandline))
             return
 
         str = "Job=%s" % (self.jobHandle)
@@ -299,15 +326,20 @@ class JobStatus(object):
                 str += ", finished, results are at %s" % (self.resultsUrl)
         else:
             str += ", not finished, stage=%s" % (self.jobStage)
-        print str
+        print(str)
         if messages:
             for m in self.messages:
-                print "\t%s" % (m)
-            
+                print("\t%s" % (m))
+            if self.metadata:
+                print("Metadata:")
+                for key in self.metadata:
+                    print("\t%s=%s" % (key, self.metadata[key]))
+            else:
+                print("There is no metadata")
 
     def update(self):
         r = self.client.__doGet__(url=self.jobUrl + "/?expand=true")
-        self.__parseJobStatus__(ET.fromstring(r.text))
+        self.__parseJobStatus__(ET.fromstring(r.text.encode('utf-8')))
 
     def delete(self):
         r = self.client.__doDelete__(url=self.jobUrl)
@@ -324,14 +356,14 @@ class JobStatus(object):
         """Returns dictionary where key is filename and value is a ResultFile object.   If job isn't 
         finished yet and you want a list of what's in the job's working dir, use "final=False", though
         be aware that the working dir is transient and only exists once the job has been staged to the
-        execution host and before it's been cleaned up."""  
+        execution host and before it's been cleaned up."""
         if final:
             url = self.resultsUrl
         else:
             url = self.workingDirUrl
         r = self.client.__doGet__(url=url)
         resultFiles = {}
-        et = ET.fromstring(r.text)
+        et = ET.fromstring(r.text.encode('utf-8'))
         for child in et.find("jobfiles"):
             resultFiles[child.find("filename").text] = ResultFile(self.client, child)
         return resultFiles
@@ -341,7 +373,7 @@ class JobStatus(object):
         if you want to download files from the working dir before the job has finished.  Once the job is finished
         use final=True to download the final results."""
         resultFiles = self.listResults(final=final)
-        for filename in resultFiles: 
+        for filename in resultFiles:
             resultFiles[filename].download(directory)
 
     def waitForCompletion(self, pollInterval=60):
@@ -350,11 +382,12 @@ class JobStatus(object):
             time.sleep(pollInterval)
             self.update()
 
-class ResultFile(object): 
+
+class ResultFile(object):
     def __init__(self, client, jobFileElement):
         self.client = client
         self.name = jobFileElement.find("filename").text
-        self.url = jobFileElement.find("downloadUri").find("url").text 
+        self.url = jobFileElement.find("downloadUri").find("url").text
         self.length = int(jobFileElement.find("length").text)
 
     def download(self, directory=None):
@@ -363,11 +396,11 @@ class ResultFile(object):
         path = os.path.join(directory, self.name)
 
         if verbose:
-            print "downloading from %s to %s" % (self.url, path)
+            print("downloading from %s to %s" % (self.url, path))
         r = self.client.__doGet__(self.url, stream=True)
         with open(path, 'wb') as outfile:
             shutil.copyfileobj(r.raw, outfile)
-    
+
     def getName(self):
         return self.name
 
@@ -376,6 +409,7 @@ class ResultFile(object):
 
     def getUrl(self):
         return self.url
+
 
 class Application(object):
     """
@@ -390,32 +424,32 @@ class Application(object):
     """
 
     def __init__(self):
-        found = False
         self.props = Props.Properties()
         confFile = os.path.expandvars(os.path.join("$SDK_VERSIONS", "testdata", "pycipres.conf"));
-        found = True
         try:
             with open(confFile) as infile:
                 self.props.load(infile)
-        except IOError, e:
-            pass
+                found = True
+        except IOError as e:
+            found = False
 
         confFile = os.path.join(os.path.expanduser("~"), "pycipres.conf");
-        found = True
         try:
             with open(confFile) as infile:
                 self.props.load(infile)
-        except IOError, e:
-            pass
+                found = True
+        except IOError as e:
+            found = False
 
         if not found:
             raise Exception("Didn't find pycipres.conf in $SDK_VERSIONS or in home directory.")
         requiredProperties = set(["APPNAME", "APPID", "USERNAME", "PASSWORD", "URL"])
         if not requiredProperties.issubset(self.props.propertyNames()):
-            raise Exception("pycipres.conf doesn't contain all the required properties: %s" % ', '.join(requiredProperties))
-        # if self.props.VERBOSE:
+            raise Exception(
+                "pycipres.conf doesn't contain all the required properties: %s" % ', '.join(requiredProperties))
+            # if self.props.VERBOSE:
             # self.props.list()
-        print "URL=%s" % (self.props.URL)
+        print("URL=%s" % (self.props.URL))
 
     def getProperties(self):
         return self.props
@@ -429,13 +463,15 @@ def main():
     global verbose
     properties = Application().getProperties()
     client = Client(properties.APPNAME, properties.APPID, properties.USERNAME, properties.PASSWORD, properties.URL)
+    if properties.VERBOSE:
+        verbose = True
 
     try:
 
         job = client.submitJob(
-            {"toolId" : "CLUSTALW", "runtime_" : ".1"},
-            {"infile_" : "/users/u4/terri/samplefiles/fasta/ex1.fasta"},
-            {"statusEmail" : "true"}, validateOnly=True)
+            {"toolId": "CLUSTALW", "runtime_": ".1"},
+            {"infile_": "/users/u4/terri/samplefiles/fasta/ex1.fasta"},
+            {"statusEmail": "true"}, validateOnly=True)
         job.show(messages=True)
 
         """
@@ -463,27 +499,32 @@ def main():
                 ("estimate_modelavg_", "0"),
                 ("print_paup_", "0")
             ],
-            {"infile_" : "/users/u4/terri/samplefiles/fasta/ex1.fasta"},
-            {"statusEmail" : "true"}, validateOnly=True)
+            {"infile_": "/users/u4/terri/samplefiles/fasta/ex1.fasta"},
+            {"statusEmail": "true"}, validateOnly=True)
         job.show(messages=True)
         return 1
 
     except ValidationError as ve:
-        print ve.asString()
+        print(ve.asString())
         if verbose:
             raise
         return 1
     except CipresError as ce:
-        print "CIPRES ERROR: %s" % ( ce )
+        print("CIPRES ERROR: %s" % (ce))
         if verbose:
             raise
         return 1
     except requests.exceptions.RequestException as e:
-        print "CONNECTION ERROR: %s" % (e)
+        print("CONNECTION ERROR: %s" % (e))
         if verbose:
-            raise 
+            raise
         return 1
-
+    except ET.ParseError as pe:
+        print("Unexpected response cannot be parsed.  Parsing error message: %s" % (pe))
+        ###if vervose:  changed by Madhu
+        if verbose:
+            raise
+        return 1
 
 
 if __name__ == "__main__":

@@ -31,7 +31,6 @@ license.
 
 """
 
-
 """
 Terri Schwartz: modified this class to fix accessing properties not as dictionary
 but as class member.  Also modified to support multiple string values for the
@@ -39,21 +38,22 @@ same key.
 
 """
 
-import sys,os
+import os
 import re
+import sys
 import time
 import traceback
 
 
 class IllegalArgumentException(Exception):
-
     def __init__(self, lineno, msg):
         self.lineno = lineno
         self.msg = msg
 
     def __str__(self):
-        s='Exception at line number %d => %s' % (self.lineno, self.msg)
+        s = 'Exception at line number %d => %s' % (self.lineno, self.msg)
         return s
+
 
 class Properties(object):
     """ A Python replacement for java.util.Properties """
@@ -80,11 +80,11 @@ class Properties(object):
         self.bspacere = re.compile(r'\\(?!\s$)')
 
     def __str__(self):
-        s='{'
-        for key,value in self._props.items():
-            s = ''.join((s,key,'=',value,', '))
+        s = '{'
+        for key, value in self._props.items():
+            s = ''.join((s, key, '=', value, ', '))
 
-        s=''.join((s[:-2],'}'))
+        s = ''.join((s[:-2], '}'))
         return s
 
     def __parse(self, lines):
@@ -123,7 +123,7 @@ class Properties(object):
         # This is a line parser. It parses the
         # contents like by line.
 
-        lineno=0
+        lineno = 0
         i = iter(lines)
 
         for line in i:
@@ -132,9 +132,9 @@ class Properties(object):
             # Skip null lines
             if not line: continue
             # Skip lines which are comments
-            if line[0] in ('#','!'): continue
+            if line[0] in ('#', '!'): continue
             # Some flags
-            escaped=False
+            escaped = False
             # Position of first separation char
             sepidx = -1
             # A flag for performing wspace re check
@@ -174,7 +174,6 @@ class Properties(object):
                 sepidx = last - 1
                 # print line[sepidx]
 
-
             # If the last character is a backslash
             # it has to be preceded by a space in which
             # case the next line is read as part of the
@@ -189,9 +188,9 @@ class Properties(object):
 
             # Now split to key,value according to separation char
             if sepidx != -1:
-                key, value = line[:sepidx], line[sepidx+1:]
+                key, value = line[:sepidx], line[sepidx + 1:]
             else:
-                key,value = line,''
+                key, value = line, ''
             self._keyorder.append(key)
             self.processPair(key, value)
 
@@ -209,7 +208,7 @@ class Properties(object):
         lastpart = keyparts[-1]
 
         if lastpart.find('\\ ') != -1:
-            keyparts[-1] = lastpart.replace('\\','')
+            keyparts[-1] = lastpart.replace('\\', '')
 
         # If no backspace is found at the end, but empty
         # space is found, strip it
@@ -253,16 +252,16 @@ class Properties(object):
         # Java escapes the '=' and ':' in the value
         # string with backslashes in the store method.
         # So let us do the same.
-        newvalue = value.replace(':','\:')
-        newvalue = newvalue.replace('=','\=')
+        newvalue = value.replace(':', '\:')
+        newvalue = newvalue.replace('=', '\=')
 
         return newvalue
 
     def unescape(self, value):
 
         # Reverse of escape
-        newvalue = value.replace('\:',':')
-        newvalue = newvalue.replace('\=','=')
+        newvalue = value.replace('\:', ':')
+        newvalue = newvalue.replace('\=', '=')
 
         return newvalue
 
@@ -271,13 +270,18 @@ class Properties(object):
 
         # For the time being only accept file input streams
         if type(stream) is not file:
-            raise TypeError,'Argument should be a file object!'
+            raise TypeError, 'Argument should be a file object!'
         # Check for the opened mode
         if stream.mode != 'r':
-            raise ValueError,'Stream should be opened in read-only mode!'
+            raise ValueError, 'Stream should be opened in read-only mode!'
 
+        # Rafael modified because windows converts to utf-16
         try:
             lines = stream.readlines()
+            # if os.name == 'nt':
+            #     for idx, item in enumerate(lines):
+            #         item = item.replace('\x00', '')
+            #         lines[idx] = item
             self.__parse(lines)
         except IOError, e:
             raise
@@ -292,14 +296,13 @@ class Properties(object):
             return self._props.get(key)[0]
         return None
 
-
     def setProperty(self, key, value):
         """ Set the property for the given key """
 
         if type(key) is str and type(value) is str:
             self.processPair(key, value)
         else:
-            raise TypeError,'both key and value should be strings!'
+            raise TypeError, 'both key and value should be strings!'
 
     def propertyNames(self):
         """ Return an iterator over all the keys of the property
@@ -312,32 +315,31 @@ class Properties(object):
         stream 'out' which defaults to the standard output """
 
         out.write('-- listing properties --\n')
-        for key,value in self._props.items():
+        for key, value in self._props.items():
             # out.write(''.join((key,'='value,'\n')))
             if not value or not len(value):
-                out.write(''.join((key,'=','\n')))
+                out.write(''.join((key, '=', '\n')))
             else:
                 for v in value:
-                    out.write(''.join((key,'=', v, '\n')))
-                
+                    out.write(''.join((key, '=', v, '\n')))
 
     def store(self, out, header=""):
         """ Write the properties list to the stream 'out' along
         with the optional 'header' """
 
         if out.mode[0] != 'w':
-            raise ValueError,'Steam should be opened in write mode!'
+            raise ValueError, 'Steam should be opened in write mode!'
 
         try:
-            out.write(''.join(('#',header,'\n')))
+            out.write(''.join(('#', header, '\n')))
             # Write timestamp
             tstamp = time.strftime('%a %b %d %H:%M:%S %Z %Y', time.localtime())
-            out.write(''.join(('#',tstamp,'\n')))
+            out.write(''.join(('#', tstamp, '\n')))
             # Write properties from the pristine dictionary
             for prop in self._keyorder:
                 if prop in self._origprops:
                     val = self._origprops[prop]
-                    out.write(''.join((prop,'=',self.escape(val),'\n')))
+                    out.write(''.join((prop, '=', self.escape(val), '\n')))
 
             out.close()
         except IOError, e:
@@ -348,9 +350,10 @@ class Properties(object):
         retval = {}
         for key in self._props:
             retval[key] = self._props[key][0]
-        return retval 
+        return retval
 
-    # Terri: returns the internal dictionary object, where each value is a list.
+        # Terri: returns the internal dictionary object, where each value is a list.
+
     def getRawPropertyDict(self):
         return self._props
 
@@ -360,8 +363,8 @@ class Properties(object):
         retval = []
         for key in self._props:
             for value in self._props[key]:
-                retval.append( (key, value) )
-        return retval 
+                retval.append((key, value))
+        return retval
 
     def __getitem__(self, name):
         """ To support direct dictionary like access """
@@ -382,10 +385,10 @@ class Properties(object):
         except KeyError:
             if self._props[name]:
                 return self._props[name][0]
-            return None 
-                
+            return None
 
-if __name__=="__main__":
+
+if __name__ == "__main__":
     p = Properties()
     p.load(open('test2.properties'))
     p.list()
@@ -395,5 +398,5 @@ if __name__=="__main__":
     p['name3'] = 'changed = value'
     print p['name3']
     p['new key'] = 'new value'
-    p.store(open('test2.properties','w'))
+    p.store(open('test2.properties', 'w'))
     print p.name3

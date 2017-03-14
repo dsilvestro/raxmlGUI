@@ -1,3 +1,0 @@
-pymysql == 0.5
-requests == 2.5.3
-pystache == 0.5.3
